@@ -4,3 +4,7 @@ torch
 torchvision
 opencv-python-headless
 lightning
+pandas
+matplotlib
+seaborn
+fpdf

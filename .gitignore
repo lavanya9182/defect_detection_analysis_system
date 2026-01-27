@@ -1,3 +1,25 @@
-results/
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+.env/
+
+# Large datasets
+dataset/
+data/
+
+# Logs
+*.log
+
+# Model weights
 *.pt
+*.pth
 *.ckpt
+
+# Streamlit cache
+.streamlit/
+
+# OS files
+.DS_Store
