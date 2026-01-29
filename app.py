@@ -28,20 +28,60 @@ tab_inference, tab_analytics = st.tabs(["🕵️ Inference & Inspection", "📊 
 
 # --- Model Loading ---
 @st.cache_resource
-def load_model(weights_path):
-    if not os.path.exists(weights_path):
-        st.error(f"Model weights not found at {weights_path}. Please run training first.")
-        return None
+def load_models(anomaly_weights_path, classifier_weights_path):
+    models = {}
     
-    inferencer = TorchInferencer(
-        path=weights_path,
-        device="cpu", 
-    )
-    return inferencer
+    # 1. Anomaly Model (PatchCore)
+    if not os.path.exists(anomaly_weights_path):
+        st.error(f"Anomaly weights not found at {anomaly_weights_path}. Please run training first.")
+    else:
+        models['anomaly'] = TorchInferencer(
+            path=anomaly_weights_path,
+            device="cpu", 
+        )
+        
+    # 2. Classifier Model (ResNet18)
+    if os.path.exists(classifier_weights_path):
+        from torchvision import models as tv_models
+        from torchvision import transforms
+        import torch.nn as nn
+        
+        # Load checkpoint
+        checkpoint = torch.load(classifier_weights_path, map_location=torch.device('cpu'))
+        class_names = checkpoint['class_names']
+        
+        # Re-create model structure
+        classifier = tv_models.resnet18(weights=None)
+        num_ftrs = classifier.fc.in_features
+        classifier.fc = nn.Linear(num_ftrs, len(class_names))
+        
+        # Load weights
+        classifier.load_state_dict(checkpoint['model_state_dict'])
+        classifier.eval()
+        
+        models['classifier'] = classifier
+        models['classes'] = class_names
+        
+        # Transforms for classifier
+        models['transforms'] = transforms.Compose([
+            transforms.Resize((256, 256)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
+    else:
+        st.warning(f"Classifier weights not found at {classifier_weights_path}. Automatic defect typing disabled.")
+        
+    return models
 
-# Path where train.py exports the model
-MODEL_PATH = "results/weights/weights/torch/model.pt"
-model = load_model(MODEL_PATH)
+# Paths
+ANOMALY_MODEL_PATH = "results/weights/weights/torch/model.pt"
+CLASSIFIER_MODEL_PATH = "results/classifier.pth"
+
+loaded_models = load_models(ANOMALY_MODEL_PATH, CLASSIFIER_MODEL_PATH)
+model = loaded_models.get('anomaly')
+classifier = loaded_models.get('classifier')
+class_names = loaded_models.get('classes')
+classifier_transforms = loaded_models.get('transforms')
 
 # ==========================================
 # TAB 1: INFERENCE
@@ -59,14 +99,6 @@ with tab_inference:
         
         with col1:
             st.image(image, caption="Original Image", use_column_width=True)
-
-        # Defect Type Manual Input (Optional)
-        st.markdown("#### Inspection Details")
-        defect_type_input = st.selectbox(
-            "Select Defect Type (if visible)", 
-            ["Normal", "Crack", "Hole", "Color Mismatch", "Contamination", "Deformed", "Other"],
-            index=0
-        )
 
         if st.button("Analyze Image"):
             if model is None:
@@ -100,20 +132,34 @@ with tab_inference:
                         else:
                             severity = "Critical"
                             
-                    # Manual Override for specific defect type mapping
+                    # --- Automatic Defect Classification ---
                     final_defect_type = "Normal"
+                    
                     if is_defect:
-                         # If user left it as "Normal" but model says Defect, label as "General Defect"
-                         if defect_type_input == "Normal":
+                        if classifier is not None:
+                            # Prepare image for classifier (using PIL image)
+                            input_tensor = classifier_transforms(image).unsqueeze(0) # Add batch dim
+                            
+                            with torch.no_grad():
+                                outputs = classifier(input_tensor)
+                                _, preds = torch.max(outputs, 1)
+                                predicted_class = class_names[preds[0]]
+                                
+                            # Logic: If classifier says "good" but PatchCore says "Defect",
+                            # we report "Unclassified" or potential false positive.
+                            if predicted_class == "good":
+                                final_defect_type = "Unclassified (Potential False Positive)"
+                            else:
+                                final_defect_type = predicted_class
+                        else:
                              final_defect_type = "General Defect"
-                         else:
-                             final_defect_type = defect_type_input
+                    else:
+                        final_defect_type = "Normal (Good)"
                     
                     # --- Results ---
                     st.success("Analysis Complete!")
                     
                     # Log to DB
-                    # Generate a unique short ID for the image/inspection
                     inspection_id = str(uuid.uuid4())[:8]
                     db.log_inspection(
                         image_id=inspection_id,
@@ -201,9 +247,7 @@ with tab_analytics:
         st.subheader("📄 Generate Report")
         
         if st.button("Generate PDF Report"):
-            # collect charts
             charts = [chart_status, chart_dist, chart_trend]
-            # filter defects df
             df_defects = df[df['status'] == 'Defect']
             
             report_file = report.generate_qa_report(period, stats, df_defects, charts)
