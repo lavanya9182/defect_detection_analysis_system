@@ -32,6 +32,19 @@ def load_models(anomaly_weights_path, classifier_weights_path):
     models = {}
     
     # 1. Anomaly Model (PatchCore)
+    # Check for split parts first (GitHub workaround)
+    if not os.path.exists(anomaly_weights_path):
+        part_prefix = anomaly_weights_path + ".part_"
+        if os.path.exists(part_prefix + "aa"): # Check for first part
+            st.info("Reconstructing model from parts...")
+            with open(anomaly_weights_path, 'wb') as dest:
+                for suffix in ['aa', 'ab', 'ac', 'ad']: # Adjust based on number of parts needed (227MB / 90MB ~= 3 parts: aa, ab, ac)
+                    part_file = part_prefix + suffix
+                    if os.path.exists(part_file):
+                        with open(part_file, 'rb') as src:
+                            dest.write(src.read())
+            st.success("Model reconstructed successfully!")
+
     if not os.path.exists(anomaly_weights_path):
         st.error(f"Anomaly weights not found at {anomaly_weights_path}. Please run training first.")
     else:
