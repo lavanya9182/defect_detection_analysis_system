@@ -94,7 +94,7 @@ def generate_qa_report(period, stats, df_defects, charts):
     # 5. Recent Defects Table
     pdf.add_page()
     pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, "Recent Defect Log (Last 10)", 0, 1)
+    pdf.cell(0, 10, f"Defect Log ({period})", 0, 1)
     pdf.ln(5)
     
     pdf.set_font("Arial", size=10)
@@ -108,8 +108,8 @@ def generate_qa_report(period, stats, df_defects, charts):
     
     # Rows
     if not df_defects.empty:
-        # Take last 10
-        recent = df_defects.tail(10)
+        # Use filtered data directly (no limit)
+        recent = df_defects
         for index, row in recent.iterrows():
             ts = row['timestamp'].strftime('%Y-%m-%d %H:%M') if hasattr(row['timestamp'], 'strftime') else str(row['timestamp'])
             
