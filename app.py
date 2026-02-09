@@ -31,32 +31,7 @@ tab_inference, tab_analytics = st.tabs(["🕵️ Inference & Inspection", "📊 
 def load_models(anomaly_weights_path, classifier_weights_path):
     models = {}
     
-    # --- DEBUGGING: CHECK FILESYSTEM ---
-    st.write("### Debugging Filesystem")
-    if os.path.exists("results"):
-        for root, dirs, files in os.walk("results"):
-            for file in files:
-                try:
-                    filepath = os.path.join(root, file)
-                    if os.path.exists(filepath):
-                        filesize = os.path.getsize(filepath) / (1024 * 1024) # MB
-                        st.write(f"Found: `{filepath}` ({filesize:.2f} MB)")
-                    else:
-                        st.warning(f"File listed but not found: {filepath}")
-                except Exception as e:
-                    st.warning(f"Error accessing {file}: {e}")
-    else:
-        st.error("Directory 'results' not found!")
-        
-    # Check classifier header for LFS pointer
-    if os.path.exists(classifier_weights_path):
-        try:
-            with open(classifier_weights_path, 'rb') as f:
-                header = f.read(50)
-                st.code(f"Classifier Header: {header}", language="text")
-        except:
-            pass
-    # -----------------------------------
+
 
     # 1. Anomaly Model (PatchCore)
     # Check for split parts first (GitHub workaround)
@@ -64,16 +39,14 @@ def load_models(anomaly_weights_path, classifier_weights_path):
         part_prefix = anomaly_weights_path + ".part_"
         # Check manually if parts exist
         if os.path.exists(part_prefix + "aa"): 
-            st.info(f"Ref-constructing model from parts: {part_prefix}*")
             try:
                 with open(anomaly_weights_path, 'wb') as dest:
                     for suffix in ['aa', 'ab', 'ac', 'ad']: 
                         part_file = part_prefix + suffix
                         if os.path.exists(part_file):
-                            st.text(f"Merging part: {part_file}")
                             with open(part_file, 'rb') as src:
                                 dest.write(src.read())
-                st.success("Model reconstructed successfully!")
+                print("Model reconstructed successfully!")
             except Exception as e:
                 st.error(f"Failed to reconstruct model: {e}")
 
