@@ -19,9 +19,71 @@ os.environ["TRUST_REMOTE_CODE"] = "True"
 # Initialize DB
 db.init_db()
 
-st.set_page_config(page_title="Capsule Defect Detection", layout="wide")
+st.set_page_config(page_title="Pharma QA System", layout="wide", page_icon="💊")
 
-st.title("💊 Capsule Defect Detection System")
+# --- Custom CSS for "Super" UI ---
+st.markdown("""
+<style>
+    /* Global Font */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* Header Styling */
+    h1 {
+        color: #2E86C1;
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    /* Metric Cards */
+    div[data-testid="stMetric"] {
+        background-color: #f0f2f6;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    div[data-testid="stMetricLabel"] {
+        font-weight: 600;
+        color: #555;
+    }
+    
+    /* Tab Styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 20px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: #ffffff;
+        border-radius: 4px 4px 0px 0px;
+        gap: 1px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #e6f3ff;
+        color: #2E86C1;
+        border-bottom: 2px solid #2E86C1;
+    }
+
+    /* Button Styling */
+    .stButton button {
+        background-color: #2E86C1;
+        color: white;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+    .stButton button:hover {
+        background-color: #1B4F72;
+        color: white;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.title("Integrated Pharmaceutical Quality Analysis and Reporting System 💊")
 
 # --- Tabs ---
 tab_inference, tab_analytics = st.tabs(["🕵️ Inference & Inspection", "📊 Analytics & Reporting"])
