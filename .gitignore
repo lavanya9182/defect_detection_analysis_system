@@ -14,9 +14,10 @@ data/
 *.log
 
 # Model weights
-# *.pt
-# *.pth
-# *.ckpt
+*.pt
+*.pth
+*.ckpt
+!*.part_*
 
 # Streamlit cache
 .streamlit/
