@@ -31,27 +31,47 @@ tab_inference, tab_analytics = st.tabs(["🕵️ Inference & Inspection", "📊 
 def load_models(anomaly_weights_path, classifier_weights_path):
     models = {}
     
+    # --- DEBUGGING: CHECK FILESYSTEM ---
+    st.write("### Debugging Filesystem")
+    if os.path.exists("results"):
+        for root, dirs, files in os.walk("results"):
+            for file in files:
+                filepath = os.path.join(root, file)
+                filesize = os.path.getsize(filepath) / (1024 * 1024) # MB
+                st.write(f"Found: `{filepath}` ({filesize:.2f} MB)")
+    else:
+        st.error("Directory 'results' not found!")
+    # -----------------------------------
+
     # 1. Anomaly Model (PatchCore)
     # Check for split parts first (GitHub workaround)
     if not os.path.exists(anomaly_weights_path):
         part_prefix = anomaly_weights_path + ".part_"
-        if os.path.exists(part_prefix + "aa"): # Check for first part
-            st.info("Reconstructing model from parts...")
-            with open(anomaly_weights_path, 'wb') as dest:
-                for suffix in ['aa', 'ab', 'ac', 'ad']: # Adjust based on number of parts needed (227MB / 90MB ~= 3 parts: aa, ab, ac)
-                    part_file = part_prefix + suffix
-                    if os.path.exists(part_file):
-                        with open(part_file, 'rb') as src:
-                            dest.write(src.read())
-            st.success("Model reconstructed successfully!")
+        # Check manually if parts exist
+        if os.path.exists(part_prefix + "aa"): 
+            st.info(f"Ref-constructing model from parts: {part_prefix}*")
+            try:
+                with open(anomaly_weights_path, 'wb') as dest:
+                    for suffix in ['aa', 'ab', 'ac', 'ad']: 
+                        part_file = part_prefix + suffix
+                        if os.path.exists(part_file):
+                            st.text(f"Merging part: {part_file}")
+                            with open(part_file, 'rb') as src:
+                                dest.write(src.read())
+                st.success("Model reconstructed successfully!")
+            except Exception as e:
+                st.error(f"Failed to reconstruct model: {e}")
 
     if not os.path.exists(anomaly_weights_path):
         st.error(f"Anomaly weights not found at {anomaly_weights_path}. Please run training first.")
     else:
-        models['anomaly'] = TorchInferencer(
-            path=anomaly_weights_path,
-            device="cpu", 
-        )
+        try:
+            models['anomaly'] = TorchInferencer(
+                path=anomaly_weights_path,
+                device="cpu", 
+            )
+        except Exception as e:
+             st.error(f"Error loading Anomaly Model: {e}")
         
     # 2. Classifier Model (ResNet18)
     if os.path.exists(classifier_weights_path):
@@ -59,28 +79,33 @@ def load_models(anomaly_weights_path, classifier_weights_path):
         from torchvision import transforms
         import torch.nn as nn
         
-        # Load checkpoint
-        checkpoint = torch.load(classifier_weights_path, map_location=torch.device('cpu'))
-        class_names = checkpoint['class_names']
-        
-        # Re-create model structure
-        classifier = tv_models.resnet18(weights=None)
-        num_ftrs = classifier.fc.in_features
-        classifier.fc = nn.Linear(num_ftrs, len(class_names))
-        
-        # Load weights
-        classifier.load_state_dict(checkpoint['model_state_dict'])
-        classifier.eval()
-        
-        models['classifier'] = classifier
-        models['classes'] = class_names
-        
-        # Transforms for classifier
-        models['transforms'] = transforms.Compose([
-            transforms.Resize((256, 256)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
+        try:
+            # Load checkpoint
+            checkpoint = torch.load(classifier_weights_path, map_location=torch.device('cpu'))
+            class_names = checkpoint['class_names']
+            
+            # Re-create model structure
+            classifier = tv_models.resnet18(weights=None)
+            num_ftrs = classifier.fc.in_features
+            classifier.fc = nn.Linear(num_ftrs, len(class_names))
+            
+            # Load weights
+            classifier.load_state_dict(checkpoint['model_state_dict'])
+            classifier.eval()
+            
+            models['classifier'] = classifier
+            models['classes'] = class_names
+            
+            # Transforms for classifier
+            models['transforms'] = transforms.Compose([
+                transforms.Resize((256, 256)),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+        except Exception as e:
+            st.error(f"Failed to load classifier: {e}")
+            st.warning("Continuing without classifier...")
+            
     else:
         st.warning(f"Classifier weights not found at {classifier_weights_path}. Automatic defect typing disabled.")
         
