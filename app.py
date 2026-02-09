@@ -21,7 +21,28 @@ db.init_db()
 
 st.set_page_config(page_title="Pharma QA System", layout="wide", page_icon="💊")
 
-st.title("Integrated Pharmaceutical Quality Analysis and Reporting System")
+st.markdown("""
+<style>
+@keyframes gradient-animation {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.custom-title {
+    font-size: 28px;
+    font-weight: 700;
+    text-align: center;
+    background: linear-gradient(45deg, #1f77b4, #9467bd, #e377c2);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradient-animation 5s ease infinite;
+    margin-bottom: 20px;
+}
+</style>
+<div class="custom-title">Integrated Pharmaceutical Quality Analysis and Reporting System</div>
+""", unsafe_allow_html=True)
 
 # --- Tabs ---
 tab_inference, tab_analytics = st.tabs(["🕵️ Inference & Inspection", "📊 Analytics & Reporting"])
