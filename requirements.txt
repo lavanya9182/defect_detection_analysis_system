@@ -1,12 +1,12 @@
-#anomalib
+anomalib
 streamlit
-#torch
-#torchvision
+torch
+torchvision
 opencv-python-headless
-#lightning
+lightning
 pandas
 matplotlib
-#seaborn
+seaborn
 fpdf
 scikit-learn
 numpy
