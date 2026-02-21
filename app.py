@@ -21,31 +21,107 @@ db.init_db()
 
 st.set_page_config(page_title="Pharma QA System", layout="wide", page_icon="💊")
 
+# Professional UI Theme & CSS
 st.markdown("""
 <style>
-@keyframes gradient-animation {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-}
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
 
-.custom-title {
-    font-size: 28px;
-    font-weight: 700;
-    text-align: center;
-    background: linear-gradient(45deg, #1f77b4, #9467bd, #e377c2);
-    background-size: 200% 200%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: gradient-animation 5s ease infinite;
-    margin-bottom: 20px;
-}
+    html, body, [class*="st-at"] {
+        font-family: 'Outfit', sans-serif;
+    }
+
+    /* Main Container Glassmorphism */
+    .stApp {
+        background: radial-gradient(circle at top left, #1a1c2c, #0d0e1a);
+        color: #ffffff;
+    }
+
+    /* Sidebar Styling */
+    [data-testid="stSidebar"] {
+        background-color: rgba(20, 22, 39, 0.8) !important;
+        backdrop-filter: blur(10px);
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Professional Metric Cards */
+    .metric-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        transition: transform 0.3s ease;
+        margin-bottom: 15px;
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.08);
+    }
+    .metric-label {
+        font-size: 14px;
+        color: #a0a0c0;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .metric-value {
+        font-size: 24px;
+        font-weight: 700;
+        margin-top: 5px;
+    }
+
+    /* Custom Title */
+    .dashboard-title {
+        font-size: 36px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 30px;
+        text-align: left;
+    }
+
+    /* Custom Subheaders */
+    .custom-subheader {
+        font-size: 20px;
+        font-weight: 600;
+        color: #e2e8f0;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        border-left: 4px solid #6366f1;
+        padding-left: 15px;
+    }
+
+    /* Buttons */
+    .stButton>button {
+        background: linear-gradient(90deg, #4f46e5, #7c3aed);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 25px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+    .stButton>button:hover {
+        box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+        transform: scale(1.02);
+        color: white;
+    }
 </style>
-<div class="custom-title">Integrated Pharmaceutical Quality Analysis and Reporting System</div>
 """, unsafe_allow_html=True)
 
-# --- Tabs ---
-tab_inference, tab_analytics = st.tabs(["🕵️ Inference & Inspection", "📊 Analytics & Reporting"])
+# --- Sidebar Navigation ---
+with st.sidebar:
+    st.markdown("<h2 style='text-align: center;'>💊</h2>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #6366f1;'>Pharma QA Engine</h3>", unsafe_allow_html=True)
+    st.markdown("---")
+    page = st.radio("Navigation", ["🕵️ Real-time Inspection", "📊 Analytics Dashboard", "📝 System Info"], label_visibility="collapsed")
+    st.markdown("---")
+    st.markdown("**System Health**")
+    st.success("Operational")
+    st.markdown("---")
+    st.caption("v1.5.0 Professional Edition")
 
 # --- Model Loading ---
 @st.cache_resource
@@ -131,180 +207,158 @@ class_names = loaded_models.get('classes')
 classifier_transforms = loaded_models.get('transforms')
 
 # ==========================================
-# TAB 1: INFERENCE
+# PAGE 1: INFERENCE
 # ==========================================
-with tab_inference:
-    st.markdown("### Real-time Inspection")
-    uploaded_file = st.file_uploader("Upload Capsule Image", type=["jpg", "png", "jpeg"])
-
-    if uploaded_file is not None:
-        col1, col2 = st.columns(2)
+if page == "🕵️ Real-time Inspection":
+    st.markdown("<h1 class='dashboard-title'>Neural Inspection Interface</h1>", unsafe_allow_html=True)
+    
+    col_input, col_output = st.columns([1, 1.2])
+    
+    with col_input:
+        st.markdown("<div class='custom-subheader'>Image Acquisition</div>", unsafe_allow_html=True)
+        uploaded_file = st.file_uploader("Upload Capsule Image", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
         
-        # Preprocessing
-        image = Image.open(uploaded_file).convert("RGB")
-        image_np = np.array(image)
-        
-        with col1:
-            st.image(image, caption="Original Image", use_column_width=True)
-
-        if st.button("Analyze Image"):
-            if model is None:
-                st.error("Model not loaded.")
-            else:
-                with st.spinner("Analyzing..."):
-                    # Inference
-                    predictions = model.predict(image=image_np)
-                    
-                    pred_score = predictions.pred_score
-                    if isinstance(pred_score, torch.Tensor):
-                        pred_score = pred_score.item()
-
-                    anomaly_map = predictions.anomaly_map
-                    
-                    # --- Thresholding ---
-                    # Good images ~25.7, Defects ~70.8. Setting default to 45.0.
-                    threshold = st.slider("Anomaly Threshold", min_value=0.0, max_value=100.0, value=45.0, step=0.5)
-                    
-                    # Logic
-                    is_defect = pred_score > threshold
-                    pred_label = "Defect" if is_defect else "Good"
-                    
-                    # Determine Severity based on Score
-                    severity = "Normal"
-                    if is_defect:
-                        if pred_score < 60:
-                            severity = "Minor"
-                        elif pred_score < 80:
-                            severity = "Medium"
-                        else:
-                            severity = "Critical"
-                            
-                    # --- Automatic Defect Classification ---
-                    final_defect_type = "Normal"
-                    
-                    if is_defect:
-                        if classifier is not None:
-                            # Prepare image for classifier (using PIL image)
-                            input_tensor = classifier_transforms(image).unsqueeze(0) # Add batch dim
-                            
-                            with torch.no_grad():
-                                outputs = classifier(input_tensor)
-                                _, preds = torch.max(outputs, 1)
-                                predicted_class = class_names[preds[0]]
+        if uploaded_file:
+            image = Image.open(uploaded_file).convert("RGB")
+            image_np = np.array(image)
+            st.image(image, caption="Original Stream", use_column_width=True)
+            
+            if st.button("🚀 Analyze Capsule"):
+                if model is None:
+                    st.error("Inference module not available.")
+                else:
+                    with st.spinner("Processing Semantic Features..."):
+                        # Inference Logic
+                        predictions = model.predict(image=image_np)
+                        pred_score = predictions.pred_score
+                        if isinstance(pred_score, torch.Tensor): pred_score = pred_score.item()
+                        anomaly_map = predictions.anomaly_map
+                        
+                        # Thresholding
+                        is_defect = pred_score > 45.0
+                        pred_label = "Defect" if is_defect else "Good"
+                        
+                        # Severity
+                        severity = "Normal"
+                        if is_defect:
+                            if pred_score < 60: severity = "Minor"
+                            elif pred_score < 80: severity = "Medium"
+                            else: severity = "Critical"
                                 
-                            # Logic: If classifier says "good" but PatchCore says "Defect",
-                            # we report "Unclassified" or potential false positive.
-                            if predicted_class == "good":
-                                final_defect_type = "Unclassified (Potential False Positive)"
-                            else:
-                                final_defect_type = predicted_class
-                        else:
-                             final_defect_type = "General Defect"
-                    else:
-                        final_defect_type = "Normal (Good)"
-                    
-                    # --- Results ---
-                    st.success("Analysis Complete!")
-                    
-                    # Log to DB
-                    inspection_id = str(uuid.uuid4())[:8]
-                    db.log_inspection(
-                        image_id=inspection_id,
-                        status=pred_label,
-                        defect_type=final_defect_type,
-                        score=pred_score,
-                        severity=severity
-                    )
-                    st.toast(f"Result logged to database (ID: {inspection_id})")
-                    
-                    # Metrics Display
-                    m_col1, m_col2, m_col3 = st.columns(3)
-                    m_col1.metric("Status", pred_label, delta_color="inverse" if is_defect else "normal")
-                    m_col1.metric("Score", f"{pred_score:.2f}")
-                    m_col2.metric("Severity", severity)
-                    m_col3.metric("Defect Type", final_defect_type)
-
-                    # Visualization
-                    with col2:
-                        st.subheader("Segmentation Heatmap")
+                        # Classifier
+                        final_defect_type = "Normal"
+                        if is_defect:
+                            if classifier is not None:
+                                input_tensor = classifier_transforms(image).unsqueeze(0)
+                                with torch.no_grad():
+                                    outputs = classifier(input_tensor)
+                                    _, preds = torch.max(outputs, 1)
+                                    predicted_class = class_names[preds[0]]
+                                    final_defect_type = predicted_class if predicted_class != "good" else "Unclassified"
+                            else: final_defect_type = "General Defect"
+                        else: final_defect_type = "Normal (Good)"
                         
-                        if isinstance(anomaly_map, torch.Tensor):
-                             anomaly_map = anomaly_map.cpu().numpy()
+                        # Database Logging
+                        inspection_id = str(uuid.uuid4())[:8]
+                        db.log_inspection(inspection_id, pred_label, final_defect_type, pred_score, severity)
                         
-                        if anomaly_map.ndim == 3 and anomaly_map.shape[0] == 1:
-                            anomaly_map = anomaly_map.squeeze(0)
-                        
-                        am_min, am_max = anomaly_map.min(), anomaly_map.max()
-                        if am_max > am_min:
-                            heatmap_norm = (anomaly_map - am_min) / (am_max - am_min)
-                        else:
-                            heatmap_norm = anomaly_map
+                        # Display Results in col_output
+                        with col_output:
+                            st.markdown("<div class='custom-subheader'>Inspection Summary</div>", unsafe_allow_html=True)
                             
-                        heatmap_color = cv2.applyColorMap((heatmap_norm * 255).astype(np.uint8), cv2.COLORMAP_JET)
-                        heatmap_color = cv2.cvtColor(heatmap_color, cv2.COLOR_BGR2RGB)
-                        
-                        st.image(heatmap_color, caption="Anomaly Heatmap", use_column_width=True)
+                            # Metric Grid
+                            m1, m2 = st.columns(2)
+                            with m1:
+                                st.markdown(f"""<div class='metric-card'><div class='metric-label'>Status</div><div class='metric-value' style='color: {'#ef4444' if is_defect else '#10b981'};'>{pred_label}</div></div>""", unsafe_allow_html=True)
+                                st.markdown(f"""<div class='metric-card'><div class='metric-label'>Severity</div><div class='metric-value'>{severity}</div></div>""", unsafe_allow_html=True)
+                            with m2:
+                                st.markdown(f"""<div class='metric-card'><div class='metric-label'>Anomaly Score</div><div class='metric-value'>{pred_score:.1f}</div></div>""", unsafe_allow_html=True)
+                                st.markdown(f"""<div class='metric-card'><div class='metric-label'>Classification</div><div class='metric-value'>{final_defect_type}</div></div>""", unsafe_allow_html=True)
+                            
+                            st.markdown("<div class='custom-subheader'>Anomaly Heatmap</div>", unsafe_allow_html=True)
+                            if isinstance(anomaly_map, torch.Tensor): anomaly_map = anomaly_map.cpu().numpy()
+                            if anomaly_map.ndim == 3: anomaly_map = anomaly_map.squeeze(0)
+                            
+                            am_min, am_max = anomaly_map.min(), anomaly_map.max()
+                            heatmap_norm = (anomaly_map - am_min) / (am_max - am_min) if am_max > am_min else anomaly_map
+                            heatmap_color = cv2.applyColorMap((heatmap_norm * 255).astype(np.uint8), cv2.COLORMAP_JET)
+                            heatmap_color = cv2.cvtColor(heatmap_color, cv2.COLOR_BGR2RGB)
+                            st.image(heatmap_color, caption="Localized Defects", use_column_width=True)
 
 # ==========================================
-# TAB 2: ANALYTICS
+# PAGE 2: ANALYTICS
 # ==========================================
-with tab_analytics:
-    st.markdown("### 📊 QA Analytics Dashboard")
+elif page == "📊 Analytics Dashboard":
+    st.markdown("<h1 class='dashboard-title'>Product Quality Intelligence</h1>", unsafe_allow_html=True)
     
-    # Filters
-    period = st.selectbox("Select Time Period", ["All", "Daily", "Weekly", "Monthly"])
-    
-    if st.button("Refresh Data"):
-        st.cache_data.clear()
+    # Controls
+    ctrl1, ctrl2 = st.columns([1, 1])
+    with ctrl1:
+        period = st.selectbox("Historical Window", ["All", "Daily", "Weekly", "Monthly"])
+    with ctrl2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔄 Refresh Data Pipeline"): st.cache_data.clear()
 
-    # Fetch Data
     df = db.fetch_data(period)
     
     if df.empty:
-        st.info("No inspection data found for this period.")
+        st.info("No data available for the selected period.")
     else:
-        # Calculate Stats
         stats = analytics.calculate_stats(df)
         
-        # Summary Metrics
-        a_col1, a_col2, a_col3, a_col4 = st.columns(4)
-        a_col1.metric("Total Inspected", stats['total'])
-        a_col2.metric("Defect Rate", f"{stats['defect_rate']:.1f}%")
-        a_col3.metric("Defects Found", stats['defect_count'])
-        a_col4.metric("Most Frequent", stats['most_frequent_defect'])
+        # Dashboard Overview Metrics
+        o1, o2, o3, o4 = st.columns(4)
+        with o1: st.markdown(f"""<div class='metric-card'><div class='metric-label'>Total Inspected</div><div class='metric-value'>{stats['total']}</div></div>""", unsafe_allow_html=True)
+        with o2: st.markdown(f"""<div class='metric-card'><div class='metric-label'>Defect Rate</div><div class='metric-value'>{stats['defect_rate']:.1f}%</div></div>""", unsafe_allow_html=True)
+        with o3: st.markdown(f"""<div class='metric-card'><div class='metric-label'>Total Defects</div><div class='metric-value'>{stats['defect_count']}</div></div>""", unsafe_allow_html=True)
+        with o4: st.markdown(f"""<div class='metric-card'><div class='metric-label'>Common Defect</div><div class='metric-value'>{stats['most_frequent_defect']}</div></div>""", unsafe_allow_html=True)
         
         st.markdown("---")
         
-        # Charts
-        c_col1, c_col2 = st.columns(2)
-        
-        chart_dist = analytics.get_defect_distribution_chart(df)
-        chart_status = analytics.get_status_distribution_chart(df)
-        chart_trend = analytics.get_trend_chart(df)
-        
-        with c_col1:
-            if chart_status: st.pyplot(chart_status)
-        with c_col2:
-            if chart_dist: st.pyplot(chart_dist)
+        # Visualization Grid
+        v1, v2 = st.columns(2)
+        with v1:
+            st.markdown("<div class='custom-subheader'>Process Stability</div>", unsafe_allow_html=True)
+            st.pyplot(analytics.get_status_distribution_chart(df))
+        with v2:
+            st.markdown("<div class='custom-subheader'>Root Cause Analysis</div>", unsafe_allow_html=True)
+            st.pyplot(analytics.get_defect_distribution_chart(df))
             
-        st.markdown("#### Defect Trends")
-        if chart_trend: st.pyplot(chart_trend)
+        st.markdown("<div class='custom-subheader'>Process Trends (Anomaly Score)</div>", unsafe_allow_html=True)
+        st.pyplot(analytics.get_trend_chart(df))
         
+        # PDF Generation
         st.markdown("---")
-        st.subheader("📄 Generate Report")
-        
-        if st.button("Generate PDF Report"):
-            charts = [chart_status, chart_dist, chart_trend]
-            df_defects = df[df['status'] == 'Defect']
-            
-            report_file = report.generate_qa_report(period, stats, df_defects, charts)
-            
+        st.markdown("<div class='custom-subheader'>Compliance Documentation</div>", unsafe_allow_html=True)
+        if st.button("📄 Generate PDF Audit Report"):
+            charts = [analytics.get_status_distribution_chart(df), analytics.get_defect_distribution_chart(df), analytics.get_trend_chart(df)]
+            report_file = report.generate_qa_report(period, stats, df[df['status'] == 'Defect'], charts)
             with open(report_file, "rb") as f:
-                pdf_bytes = f.read()
-                
-            st.download_button(
-                label="📥 Download PDF Report",
-                data=pdf_bytes,
-                file_name=report_file,
-                mime="application/pdf"
-            )
+                st.download_button("📥 Export Audit PDF", f, file_name=report_file)
+
+# ==========================================
+# PAGE 3: SYSTEM INFO
+# ==========================================
+elif page == "📝 System Info":
+    st.markdown("<h1 class='dashboard-title'>System Configuration</h1>", unsafe_allow_html=True)
+    
+    col_info, col_img = st.columns([1, 1])
+    with col_info:
+        st.markdown("""
+        ### Integrated QA Architecture
+        This system combines state-of-the-art anomaly detection with fine-grained classification.
+        
+        - **Primary Model**: PatchCore (WideResNet-50 backbone)
+        - **Classifier**: ResNet-18 (Transfer Learning)
+        - **Database**: SQLite3 Secure Logging
+        - **Backend**: Python 3.12 / PyTorch 2.x
+        
+        ### Operational Thresholds
+        - **Anomaly Threshold**: 45.0 (Calibrated for MVTecAD Capsule)
+        - **Minor Severity**: < 60
+        - **Medium Severity**: 60 - 80
+        - **Critical Severity**: > 80
+        """)
+    
+    with col_img:
+        st.image("https://images.unsplash.com/photo-1587854692152-cbe660dbbb88?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", caption="Industrial QA Environment")
