@@ -1,2 +1,2 @@
-libgl1
-libxrender1
+# Using opencv-python-headless which doesn't need system libGL
+# No system packages needed for now
