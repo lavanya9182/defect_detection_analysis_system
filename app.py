@@ -8,18 +8,19 @@ import os
 import tempfile
 import uuid
 
+# MUST BE THE FIRST STREAMLIT COMMAND
+st.set_page_config(page_title="Pharma QA System", layout="wide", page_icon="💊")
+
+# Allow loading pickle models
+os.environ["TRUST_REMOTE_CODE"] = "True"
+
 # Custom Modules
 import db
 import analytics
 import report
 
-# Allow loading pickle models
-os.environ["TRUST_REMOTE_CODE"] = "True"
-
 # Initialize DB
 db.init_db()
-
-st.set_page_config(page_title="Pharma QA System", layout="wide", page_icon="💊")
 
 # Professional UI Theme & CSS
 st.markdown("""
@@ -134,21 +135,27 @@ def load_models(anomaly_weights_path, classifier_weights_path):
     # Check for split parts first (GitHub workaround)
     if not os.path.exists(anomaly_weights_path):
         part_prefix = anomaly_weights_path + ".part_"
-        # Check manually if parts exist
+        # Check if at least the first part exists
         if os.path.exists(part_prefix + "aa"): 
             try:
-                with open(anomaly_weights_path, 'wb') as dest:
+                # Use a temp file for reconstruction to avoid corrupting the path if interrupted
+                with tempfile.NamedTemporaryFile(delete=False, dir=os.path.dirname(anomaly_weights_path)) as tmp_file:
+                    reconstructed_temp = tmp_file.name
                     for suffix in ['aa', 'ab', 'ac', 'ad']: 
                         part_file = part_prefix + suffix
                         if os.path.exists(part_file):
                             with open(part_file, 'rb') as src:
-                                dest.write(src.read())
+                                tmp_file.write(src.read())
+                
+                # Atomic rename
+                os.rename(reconstructed_temp, anomaly_weights_path)
                 print("Model reconstructed successfully!")
             except Exception as e:
+                if os.path.exists(reconstructed_temp): os.remove(reconstructed_temp)
                 st.error(f"Failed to reconstruct model: {e}")
 
     if not os.path.exists(anomaly_weights_path):
-        st.error(f"Anomaly weights not found at {anomaly_weights_path}. Please run training first.")
+        st.error(f"Anomaly weights not found. System may be initialising or weights are missing.")
     else:
         try:
             models['anomaly'] = TorchInferencer(
@@ -156,7 +163,9 @@ def load_models(anomaly_weights_path, classifier_weights_path):
                 device="cpu", 
             )
         except Exception as e:
-             st.error(f"Error loading Anomaly Model: {e}")
+             st.error(f"Error loading Anomaly Model (Weights may be corrupt): {e}")
+             # Optional: delete corrupt file to trigger retry on next run?
+             # os.remove(anomaly_weights_path) 
         
     # 2. Classifier Model (ResNet18)
     if os.path.exists(classifier_weights_path):
