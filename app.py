@@ -1,187 +1,124 @@
 import streamlit as st
-import numpy as np
-from PIL import Image
-import torch
-from anomalib.deploy import TorchInferencer
-import cv2
 import os
-import tempfile
-import uuid
+import sys
 
 # MUST BE THE FIRST STREAMLIT COMMAND
 st.set_page_config(page_title="Pharma QA System", layout="wide", page_icon="💊")
 
-# Allow loading pickle models
-os.environ["TRUST_REMOTE_CODE"] = "True"
+# --- INITIAL DIAGNOSTICS ---
+st.write("### 🧪 System Initialization")
+st.caption("Environment: Streamlit Cloud / Python " + sys.version.split()[0])
 
-# Custom Modules
-import db
-import analytics
-import report
-
-# Initialize DB
-db.init_db()
-
-# Professional UI Theme & CSS
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
-
-    html, body, [class*="st-at"] {
-        font-family: 'Outfit', sans-serif;
-    }
-
-    /* Main Container Glassmorphism */
-    .stApp {
-        background: radial-gradient(circle at top left, #1a1c2c, #0d0e1a);
-        color: #ffffff;
-    }
-
-    /* Sidebar Styling */
-    [data-testid="stSidebar"] {
-        background-color: rgba(20, 22, 39, 0.8) !important;
-        backdrop-filter: blur(10px);
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    /* Professional Metric Cards */
-    .metric-card {
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 20px;
-        border-radius: 15px;
-        text-align: center;
-        transition: transform 0.3s ease;
-        margin-bottom: 15px;
-    }
-    .metric-card:hover {
-        transform: translateY(-5px);
-        background: rgba(255, 255, 255, 0.08);
-    }
-    .metric-label {
-        font-size: 14px;
-        color: #a0a0c0;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .metric-value {
-        font-size: 24px;
-        font-weight: 700;
-        margin-top: 5px;
-    }
-
-    /* Custom Title */
-    .dashboard-title {
-        font-size: 36px;
-        font-weight: 700;
-        background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 30px;
-        text-align: left;
-    }
-
-    /* Custom Subheaders */
-    .custom-subheader {
-        font-size: 20px;
-        font-weight: 600;
-        color: #e2e8f0;
-        margin-top: 10px;
-        margin-bottom: 10px;
-        border-left: 4px solid #6366f1;
-        padding-left: 15px;
-    }
-
-    /* Buttons */
-    .stButton>button {
-        background: linear-gradient(90deg, #4f46e5, #7c3aed);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 25px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        width: 100%;
-    }
-    .stButton>button:hover {
-        box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
-        transform: scale(1.02);
-        color: white;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# --- Sidebar Navigation ---
-with st.sidebar:
-    st.markdown("<h2 style='text-align: center;'>💊</h2>", unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center; color: #6366f1;'>Pharma QA Engine</h3>", unsafe_allow_html=True)
-    st.markdown("---")
-    page = st.radio("Navigation", ["🕵️ Real-time Inspection", "📊 Analytics Dashboard", "📝 System Info"], label_visibility="collapsed")
-    st.markdown("---")
-    st.markdown("**System Health**")
-    st.success("Operational")
-    st.markdown("---")
-    st.caption("v1.5.0 Professional Edition")
-
-# --- Model Loading ---
-@st.cache_resource
-def load_models(anomaly_weights_path, classifier_weights_path):
-    models = {}
-    
-    # 1. Anomaly Model (PatchCore)
-    if not os.path.exists(anomaly_weights_path):
-        part_prefix = anomaly_weights_path + ".part_"
-        if os.path.exists(part_prefix + "aa"): 
-            try:
-                with tempfile.NamedTemporaryFile(delete=False, dir=os.path.dirname(anomaly_weights_path)) as tmp_file:
-                    reconstructed_temp = tmp_file.name
-                    for suffix in ['aa', 'ab', 'ac']: 
-                        part_file = part_prefix + suffix
-                        if os.path.exists(part_file):
-                            with open(part_file, 'rb') as src:
-                                tmp_file.write(src.read())
-                        else:
-                            raise FileNotFoundError(f"Missing model part: {part_file}")
-                os.rename(reconstructed_temp, anomaly_weights_path)
-            except Exception as e:
-                if 'reconstructed_temp' in locals() and os.path.exists(reconstructed_temp): os.remove(reconstructed_temp)
-                st.error(f"Failed to reconstruct model: {e}")
-
-    if os.path.exists(anomaly_weights_path):
-        try:
-            models['anomaly'] = TorchInferencer(path=anomaly_weights_path, device="cpu")
-        except Exception as e:
-             st.error(f"Error loading Anomaly Model: {e}")
-        
-    # 2. Classifier Model (ResNet18)
-    if os.path.exists(classifier_weights_path):
-        from torchvision import models as tv_models
-        from torchvision import transforms
-        import torch.nn as nn
-        try:
-            checkpoint = torch.load(classifier_weights_path, map_location=torch.device('cpu'))
-            class_names = checkpoint['class_names']
-            classifier = tv_models.resnet18(weights=None)
-            num_ftrs = classifier.fc.in_features
-            classifier.fc = nn.Linear(num_ftrs, len(class_names))
-            classifier.load_state_dict(checkpoint['model_state_dict'])
-            classifier.eval()
-            models['classifier'] = classifier
-            models['classes'] = class_names
-            models['transforms'] = transforms.Compose([
-                transforms.Resize((256, 256)),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ])
-        except Exception as e:
-            st.error(f"Failed to load classifier: {e}")
-            
-    return models
-
-# --- Execution Logic ---
 try:
-    # Paths
+    with st.status("Verifying Core Dependencies...", expanded=False) as status:
+        import numpy as np
+        st.write("✅ NumPy loaded")
+        from PIL import Image
+        st.write("✅ PIL loaded")
+        import torch
+        st.write(f"✅ PyTorch {torch.__version__} loaded")
+        import cv2
+        st.write("✅ OpenCV loaded")
+        import tempfile
+        import uuid
+        from anomalib.deploy import TorchInferencer
+        st.write("✅ Anomalib loaded")
+        status.update(label="Dependencies Verified!", state="complete")
+
+    # Allow loading pickle models
+    os.environ["TRUST_REMOTE_CODE"] = "True"
+
+    with st.status("Initializing Database & Modules...", expanded=False) as status:
+        import db
+        db.init_db()
+        st.write("✅ Database initialized")
+        import analytics
+        st.write("✅ Analytics logic loaded")
+        import report
+        st.write("✅ Reporting logic loaded")
+        status.update(label="Modules Ready!", state="complete")
+
+    # Professional UI Theme & CSS
+    st.markdown("""
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+        html, body, [class*="st-at"] { font-family: 'Outfit', sans-serif; }
+        .stApp { background: radial-gradient(circle at top left, #1a1c2c, #0d0e1a); color: #ffffff; }
+        [data-testid="stSidebar"] { background-color: rgba(20, 22, 39, 0.8) !important; backdrop-filter: blur(10px); border-right: 1px solid rgba(255, 255, 255, 0.1); }
+        .metric-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 15px; }
+        .metric-label { font-size: 14px; color: #a0a0c0; text-transform: uppercase; letter-spacing: 1px; }
+        .metric-value { font-size: 24px; font-weight: 700; margin-top: 5px; }
+        .dashboard-title { font-size: 36px; font-weight: 700; background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 30px; }
+        .custom-subheader { font-size: 20px; font-weight: 600; color: #e2e8f0; margin-top: 10px; margin-bottom: 10px; border-left: 4px solid #6366f1; padding-left: 15px; }
+        .stButton>button { background: linear-gradient(90deg, #4f46e5, #7c3aed); color: white; border-radius: 8px; width: 100%; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # --- Sidebar Navigation ---
+    with st.sidebar:
+        st.markdown("<h2 style='text-align: center;'>💊</h2>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center; color: #6366f1;'>Pharma QA Engine</h3>", unsafe_allow_html=True)
+        st.markdown("---")
+        page = st.radio("Navigation", ["🕵️ Real-time Inspection", "📊 Analytics Dashboard", "📝 System Info"], label_visibility="collapsed")
+        st.markdown("---")
+        st.markdown("**System Health**")
+        st.success("Operational")
+        st.caption("v1.5.0 Professional Edition")
+
+    # --- Model Loading Logic ---
+    @st.cache_resource
+    def load_models(anomaly_weights_path, classifier_weights_path):
+        models = {}
+        
+        # 1. Anomaly Model (PatchCore)
+        if not os.path.exists(anomaly_weights_path):
+            part_prefix = anomaly_weights_path + ".part_"
+            if os.path.exists(part_prefix + "aa"): 
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, dir=os.path.dirname(anomaly_weights_path)) as tmp_file:
+                        reconstructed_temp = tmp_file.name
+                        for suffix in ['aa', 'ab', 'ac']: 
+                            part_file = part_prefix + suffix
+                            if os.path.exists(part_file):
+                                with open(part_file, 'rb') as src:
+                                    tmp_file.write(src.read())
+                            else:
+                                raise FileNotFoundError(f"Missing model part: {part_file}")
+                    os.rename(reconstructed_temp, anomaly_weights_path)
+                except Exception as e:
+                    if 'reconstructed_temp' in locals() and os.path.exists(reconstructed_temp): os.remove(reconstructed_temp)
+                    st.error(f"Failed to reconstruct model: {e}")
+
+        if os.path.exists(anomaly_weights_path):
+            try:
+                models['anomaly'] = TorchInferencer(path=anomaly_weights_path, device="cpu")
+            except Exception as e:
+                 st.error(f"Error loading Anomaly Model: {e}")
+            
+        if os.path.exists(classifier_weights_path):
+            from torchvision import models as tv_models
+            from torchvision import transforms
+            import torch.nn as nn
+            try:
+                checkpoint = torch.load(classifier_weights_path, map_location=torch.device('cpu'))
+                class_names = checkpoint['class_names']
+                classifier = tv_models.resnet18(weights=None)
+                num_ftrs = classifier.fc.in_features
+                classifier.fc = nn.Linear(num_ftrs, len(class_names))
+                classifier.load_state_dict(checkpoint['model_state_dict'])
+                classifier.eval()
+                models['classifier'] = classifier
+                models['classes'] = class_names
+                models['transforms'] = transforms.Compose([
+                    transforms.Resize((256, 256)),
+                    transforms.ToTensor(),
+                    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+                ])
+            except Exception as e:
+                st.error(f"Failed to load classifier: {e}")
+        return models
+
+    # --- EXECUTION ---
     ANOMALY_MODEL_PATH = "results/weights/weights/torch/model.pt"
     CLASSIFIER_MODEL_PATH = "results/classifier.pth"
 
@@ -199,22 +136,18 @@ try:
         with col_input:
             st.markdown("<div class='custom-subheader'>Image Acquisition</div>", unsafe_allow_html=True)
             uploaded_file = st.file_uploader("Upload Capsule Image", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
-            
             if uploaded_file:
                 image = Image.open(uploaded_file).convert("RGB")
                 image_np = np.array(image)
                 st.image(image, caption="Original Stream", use_column_width=True)
-                
                 if st.button("🚀 Analyze Capsule"):
-                    if model is None:
-                        st.error("Inference module not available.")
+                    if model is None: st.error("Inference module unavailable.")
                     else:
-                        with st.spinner("Processing Semantic Features..."):
+                        with st.spinner("Processing..."):
                             predictions = model.predict(image=image_np)
                             pred_score = predictions.pred_score
                             if isinstance(pred_score, torch.Tensor): pred_score = pred_score.item()
                             anomaly_map = predictions.anomaly_map
-                            
                             is_defect = pred_score > 45.0
                             pred_label = "Defect" if is_defect else "Good"
                             
@@ -260,16 +193,10 @@ try:
     # PAGE 2: ANALYTICS
     elif page == "📊 Analytics Dashboard":
         st.markdown("<h1 class='dashboard-title'>Product Quality Intelligence</h1>", unsafe_allow_html=True)
-        ctrl1, ctrl2 = st.columns([1, 1])
-        with ctrl1:
-            period = st.selectbox("Historical Window", ["All", "Daily", "Weekly", "Monthly"])
-        with ctrl2:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🔄 Refresh Data Pipeline"): st.cache_data.clear()
-
+        period = st.selectbox("Historical Window", ["All", "Daily", "Weekly", "Monthly"])
+        if st.button("🔄 Refresh Data Pipeline"): st.cache_data.clear()
         df = db.fetch_data(period)
-        if df.empty:
-            st.info("No data available for the selected period.")
+        if df.empty: st.info("No data available.")
         else:
             stats = analytics.calculate_stats(df)
             o1, o2, o3, o4 = st.columns(4)
@@ -277,46 +204,24 @@ try:
             with o2: st.markdown(f"""<div class='metric-card'><div class='metric-label'>Defect Rate</div><div class='metric-value'>{stats['defect_rate']:.1f}%</div></div>""", unsafe_allow_html=True)
             with o3: st.markdown(f"""<div class='metric-card'><div class='metric-label'>Total Defects</div><div class='metric-value'>{stats['defect_count']}</div></div>""", unsafe_allow_html=True)
             with o4: st.markdown(f"""<div class='metric-card'><div class='metric-label'>Common Defect</div><div class='metric-value'>{stats['most_frequent_defect']}</div></div>""", unsafe_allow_html=True)
-            
             st.markdown("---")
             v1, v2 = st.columns(2)
-            with v1:
-                st.markdown("<div class='custom-subheader'>Process Stability</div>", unsafe_allow_html=True)
-                st.pyplot(analytics.get_status_distribution_chart(df))
-            with v2:
-                st.markdown("<div class='custom-subheader'>Root Cause Analysis</div>", unsafe_allow_html=True)
-                st.pyplot(analytics.get_defect_distribution_chart(df))
-            st.markdown("<div class='custom-subheader'>Process Trends (Anomaly Score)</div>", unsafe_allow_html=True)
+            with v1: st.pyplot(analytics.get_status_distribution_chart(df))
+            with v2: st.pyplot(analytics.get_defect_distribution_chart(df))
             st.pyplot(analytics.get_trend_chart(df))
-            
-            st.markdown("---")
-            st.markdown("<div class='custom-subheader'>Compliance Documentation</div>", unsafe_allow_html=True)
-            if st.button("📄 Generate PDF Audit Report"):
-                charts = [analytics.get_status_distribution_chart(df), analytics.get_defect_distribution_chart(df), analytics.get_trend_chart(df)]
-                report_file = report.generate_qa_report(period, stats, df[df['status'] == 'Defect'], charts)
-                with open(report_file, "rb") as f:
-                    st.download_button("📥 Export Audit PDF", f, file_name=report_file)
 
     # PAGE 3: SYSTEM INFO
     elif page == "📝 System Info":
         st.markdown("<h1 class='dashboard-title'>System Configuration</h1>", unsafe_allow_html=True)
-        col_info, col_img_info = st.columns([1, 1])
-        with col_info:
-            st.markdown("""
-            ### Integrated QA Architecture
-            - **Primary Model**: PatchCore (WideResNet-50)
-            - **Classifier**: ResNet-18
-            - **Backend**: Python 3.12 / PyTorch 2.x
-            
-            ### Operational Thresholds
-            - **Anomaly Threshold**: 45.0
-            - **Critical Severity**: > 80
-            """)
-        with col_img_info:
-            st.image("https://images.unsplash.com/photo-1587854692152-cbe660dbbb88?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", caption="Industrial QA Environment")
+        st.markdown("""
+        ### Integrated QA Architecture
+        - **Primary Model**: PatchCore (WideResNet-50)
+        - **Classifier**: ResNet-18
+        - **Environment**: Streamlit Cloud / Ubuntu
+        """)
 
 except Exception as e:
-    st.error("### 🛑 Fatal System Error")
-    st.error(f"Critical failure during initialization: {str(e)}")
-    st.exception(e)
-    st.info("💡 **Developer Note:** Check system logs for full traceback.")
+    st.error("### 🛑 Initialization Failure")
+    st.error(f"Error: {str(e)}")
+    import traceback
+    st.code(traceback.format_exc())
