@@ -212,6 +212,15 @@ try:
             with v1: st.pyplot(analytics.get_status_distribution_chart(df))
             with v2: st.pyplot(analytics.get_defect_distribution_chart(df))
             st.pyplot(analytics.get_trend_chart(df))
+            
+            # --- PDF Generation ---
+            st.markdown("---")
+            st.markdown("<div class='custom-subheader'>Compliance Documentation</div>", unsafe_allow_html=True)
+            if st.button("📄 Generate PDF Audit Report"):
+                charts = [analytics.get_status_distribution_chart(df), analytics.get_defect_distribution_chart(df), analytics.get_trend_chart(df)]
+                report_file = report.generate_qa_report(period, stats, df[df['status'] == 'Defect'], charts)
+                with open(report_file, "rb") as f:
+                    st.download_button("📥 Export Audit PDF", f, file_name=report_file)
 
     # PAGE 3: SYSTEM INFO
     elif page == "📝 System Info":
