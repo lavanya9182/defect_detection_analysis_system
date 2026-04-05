@@ -1,5 +1,7 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 anomalib==2.2.0
 streamlit
+torch
 torchvision
 opencv-python-headless
 pandas
@@ -9,3 +11,4 @@ fpdf
 scikit-learn
 numpy<2.0.0
 Pillow<11
+

@@ -122,15 +122,18 @@ try:
     ANOMALY_MODEL_PATH = "results/weights/weights/torch/model.pt"
     CLASSIFIER_MODEL_PATH = "results/classifier.pth"
 
-    loaded_models = load_models(ANOMALY_MODEL_PATH, CLASSIFIER_MODEL_PATH)
-    model = loaded_models.get('anomaly')
-    classifier = loaded_models.get('classifier')
-    class_names = loaded_models.get('classes')
-    classifier_transforms = loaded_models.get('transforms')
-
     # PAGE 1: INFERENCE
     if page == "🕵️ Real-time Inspection":
         st.markdown("<h1 class='dashboard-title'>Neural Inspection Interface</h1>", unsafe_allow_html=True)
+        
+        # --- Lazy Load Models ---
+        with st.spinner("Initializing Deep Learning Engine..."):
+            loaded_models = load_models(ANOMALY_MODEL_PATH, CLASSIFIER_MODEL_PATH)
+            model = loaded_models.get('anomaly')
+            classifier = loaded_models.get('classifier')
+            class_names = loaded_models.get('classes')
+            classifier_transforms = loaded_models.get('transforms')
+        
         col_input, col_output = st.columns([1, 1.2])
         
         with col_input:
